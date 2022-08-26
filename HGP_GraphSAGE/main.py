@@ -14,7 +14,7 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument("--seed", type=int, default=777, help="random seed")
 parser.add_argument("--batch_size", type=int, default=512, help="batch size")
-parser.add_argument("--lr", type=float, default=0.001, help="learning rate")
+parser.add_argument("--lr", type=float, default=0.005, help="learning rate")
 parser.add_argument("--weight_decay", type=float, default=0.001, help="weight decay")
 parser.add_argument("--nhid", type=int, default=128, help="hidden size")
 parser.add_argument(
@@ -29,8 +29,8 @@ parser.add_argument(
     default=True,
     help="whether perform structure learning",
 )
-parser.add_argument("--pooling_ratio", type=float, default=0.3, help="pooling ratio")
-parser.add_argument("--dropout_ratio", type=float, default=0.001, help="dropout ratio")
+parser.add_argument("--pooling_ratio", type=float, default=0.5, help="pooling ratio")
+parser.add_argument("--dropout_ratio", type=float, default=0.05, help="dropout ratio")
 parser.add_argument("--lamb", type=float, default=1.0, help="trade-off parameter")
 parser.add_argument(
     "--dataset",
@@ -39,7 +39,7 @@ parser.add_argument(
     help="DD/PROTEINS/NCI1/NCI109/Mutagenicity/ENZYMES",
 )
 parser.add_argument("--device", type=str, default="cuda:0", help="specify cuda devices")
-parser.add_argument("--epochs", type=int, default=1000, help="maximum number of epochs")
+parser.add_argument("--epochs", type=int, default=300, help="maximum number of epochs")
 parser.add_argument(
     "--patience", type=int, default=100, help="patience for early stopping"
 )

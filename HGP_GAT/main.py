@@ -39,7 +39,7 @@ parser.add_argument(
     help="DD/PROTEINS/NCI1/NCI109/Mutagenicity/ENZYMES",
 )
 parser.add_argument("--device", type=str, default="cuda:0", help="specify cuda devices")
-parser.add_argument("--epochs", type=int, default=1000, help="maximum number of epochs")
+parser.add_argument("--epochs", type=int, default=300, help="maximum number of epochs")
 parser.add_argument(
     "--patience", type=int, default=100, help="patience for early stopping"
 )
