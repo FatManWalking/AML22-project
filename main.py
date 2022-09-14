@@ -108,4 +108,4 @@ trainer.fit(model, train_dataloaders=train_loader, val_dataloaders=val_loader)
 # Test the model [ONLY USE AFTER HPT SEARCH IS DONE]
 trainer.test(model, dataloaders=test_loader)
 
-torch.save(model.state_dict(), args_dict["output_path"])
+torch.save(model.state_dict(), f"{args_dict['output_path']}/model.pt")
