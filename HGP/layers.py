@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from sparse_softmax import Sparsemax
+from HGP.sparse_softmax import Sparsemax
 from torch.nn.parameter import Parameter  # Path changed in newer version
 from torch_geometric.data import Data
 from torch_geometric.nn.conv import MessagePassing
@@ -71,7 +71,9 @@ class GCN(MessagePassing):
         self.cached_num_edges = None
 
         self.weight = Parameter(torch.Tensor(in_channels, out_channels))
-        nn.init.xavier_uniform_(self.weight.data) # A Xavier uniform weight distribution to init the neural net is mostly more efficient then starting of a random distribution
+        nn.init.xavier_uniform_(
+            self.weight.data
+        )  # A Xavier uniform weight distribution to init the neural net is mostly more efficient then starting of a random distribution
 
         if bias:
             self.bias = Parameter(torch.Tensor(out_channels))
