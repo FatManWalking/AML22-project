@@ -63,6 +63,8 @@ lamb: 1
 sample_neighbor: True
 # Sparse Attention
 sparse_attention: True
+# Structure Learning
+structure_learning: True
 
 
 # Should there be a tensorboard log?

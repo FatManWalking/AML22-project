@@ -22,52 +22,17 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.profilers import SimpleProfiler
 
+import optuna
+from optuna.integration import PyTorchLightningPruningCallback
+from HGP.models import objective
+
 # %%
 args_dict = take_hp("configs/reduced_json.yml")
 
 pl.seed_everything(args_dict["random_seed"], workers=True)
-# %%
-# Load the dataset
-dataset = TUDataset(
-    Path.cwd().joinpath("data", args_dict["dataset"]),
-    name=args_dict["dataset"],
-    use_node_attr=True,
-)
-args_dict["num_classes"] = dataset.num_classes
-args_dict["num_features"] = dataset.num_features
 
 # %%
 filename, filepath = save_config(args_dict)
-# %%
-split_train = int(dataset.len() * args_dict["split_ratio"])
-split_val = int(dataset.len() * 1 - args_dict["split_ratio"] / args_dict["test_ratio"])
-split_test = dataset.len() - split_val - split_train
-# %%
-train_data, eval_data, test_data = random_split(
-    dataset,
-    [split_train, split_val, split_test],
-    generator=torch.Generator().manual_seed(42),
-)
-
-# %%
-train_loader = DataLoader(
-    train_data,
-    batch_size=args_dict["batch_size"],
-    shuffle=True,
-    num_workers=args_dict["num_workers"],
-)
-val_loader = DataLoader(
-    eval_data,
-    batch_size=args_dict["batch_size"],
-    shuffle=False,
-    num_workers=args_dict["num_workers"],
-)
-test_loader = DataLoader(
-    test_data,
-    batch_size=args_dict["batch_size"],
-    shuffle=False,
-    num_workers=args_dict["num_workers"],
-)
 
 # %%
 # Define the model
@@ -88,6 +53,23 @@ if args_dict["logging"]:
 else:
     assert False, "No logger defined"
 
+# %%
+# TODO: Use a class to ensure data is given
+
+
+# %%
+
+study.optimize(objective, n_trials=100, timeout=600)
+print(f"Number of finished trials: {len(study.trials)}")
+print("Best trial:")
+trial = study.best_trial
+
+print("  Value: {}".format(trial.value))
+print("  Params: ")
+for key, value in trial.params.items():
+    print("    {}: {}".format(key, value))
+# %%
+# TODO: add the best params to the model and log them
 # %%
 trainer = pl.Trainer(
     num_nodes=int(os.environ.get("GROUP_WORLD_SIZE", 1)),
