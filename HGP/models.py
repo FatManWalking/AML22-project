@@ -13,15 +13,20 @@ from torch_geometric.loader import DataLoader
 from torch_geometric.datasets import TUDataset
 
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, Any
+from pytorch_lightning.loggers import TensorBoardLogger
+import os
 
 from torch.utils.data import random_split
+from utils.utilities import get_model_checkpoint
+from pytorch_lightning.profilers import SimpleProfiler
 
 
 class Model(torch.nn.Module):
     def __init__(self, args):
         super(Model, self).__init__()
         self.args = args
+
         self.num_features = args["num_features"]
         self.nhid = args["nhid"]
         self.num_classes = args["num_classes"]
@@ -123,37 +128,39 @@ class LightModel(pl.LightningModule):
 
 
 class GraphDataModule(pl.LightningDataModule):
-    def __init__(self, args: dict):
+    def __init__(self, args: Dict[str, Any]):
         """Handels all the data loading and preprocessing"""
         super().__init__()
         self.args = args
 
-    def setup(self, stage: Optional[str] = None) -> None:
-        """Loads the dataset and splits the dataset into train, val and test"""
-        dataset = TUDataset(
+        self.dataset = TUDataset(
             str(Path.cwd().joinpath("data", self.args["dataset"])),
             name=self.args["dataset"],
             use_node_attr=True,
         )
 
-        self.args["num_classes"] = dataset.num_classes
-        self.args["num_features"] = dataset.num_features
+        self.args["num_classes"] = self.dataset.num_classes
+        self.args["num_features"] = self.dataset.num_features
 
-        split_train = int(dataset.len() * self.args["split_ratio"])
+    def setup(self, stage: Optional[str] = None) -> None:
+        """Loads the dataset and splits the dataset into train, val and test"""
+
+        split_train = int(self.dataset.len() * self.args["split_ratio"])
         split_val = int(
-            dataset.len() * 1 - self.args["split_ratio"] / self.args["test_ratio"]
+            self.dataset.len() * 1 - self.args["split_ratio"] / self.args["test_ratio"]
         )
-        split_test = dataset.len() - split_val - split_train
+        split_test = self.dataset.len() - split_val - split_train
 
         self.train_data, self.eval_data, self.test_data = random_split(
-            dataset,
+            self.dataset,
             [split_train, split_val, split_test],
             generator=torch.Generator().manual_seed(42),
         )
 
-    def update_args(self, args):
+    def update_args(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Update args for datamodule, to extend for number of classes etc."""
-        return args.update(self.args)
+        args.update(self.args)
+        return args
 
     def train_dataloader(self) -> DataLoader:
         return DataLoader(
@@ -194,18 +201,12 @@ class HPT:
             pruner=pruner,
         )
 
-        self.study.optimize(self.objective, n_trials=100, timeout=600)
+        self.study.optimize(self.objective, n_trials=20, timeout=None)
 
     def objective(self, trial: optuna.trial.Trial) -> float:
 
         # TODO: actual use layer params
 
-        n_layers = trial.suggest_int("n_layers", 1, 3)
-        dropout = trial.suggest_float("dropout", 0.2, 0.5)
-        output_dims = [
-            trial.suggest_int("n_units_l{}".format(i), 4, 128, log=True)
-            for i in range(n_layers)
-        ]
         hpt_dict = {
             "nhid": trial.suggest_int("nhid", 64, 256),
             "dropout_ratio": trial.suggest_float("dropout_ratio", 0, 0.01),
@@ -213,7 +214,7 @@ class HPT:
             "sample": trial.suggest_categorical("sample", [True, False]),
             "sparse": trial.suggest_categorical("sparse", [True, False]),
             "lambs": trial.suggest_float("lambs", 0.5, 1),
-            "num_conv_layers": trial.suggest_int("num_conv_layers", 1, 5),
+            # "num_conv_layers": trial.suggest_int("num_conv_layers", 1, 5),
             "structure_learning": trial.suggest_categorical(
                 "structure_learning", [True, False]
             ),
@@ -221,21 +222,37 @@ class HPT:
 
         self.args.update(hpt_dict)
 
-        model = LightModel(self.args).to(self.args["device"])
-        datamodule = FashionMNISTDataModule(data_dir=DIR, batch_size=BATCHSIZE)
+        if self.args["logging"]:
+            logger = TensorBoardLogger(
+                save_dir=self.args["log_path"], version=1, name="lightning_logs"
+            )
+        else:
+            assert False, "No logger defined"
+
+        self.datamodule = GraphDataModule(self.args)
+        self.args = self.datamodule.update_args(self.args)
+        self.model = LightModel(self.args).to(self.args["device"])
+
+        checkpoint_callback = get_model_checkpoint(self.args)
+        callbacks = []
+        if checkpoint_callback:
+            callbacks.append(checkpoint_callback)
+        if self.args["resume_from_checkpoint"]:
+            print(f"loading checkpoint: {self.args['output_path']}...")
+            self.model.load_from_checkpoint(checkpoint_path=self.args["output_path"])
 
         trainer = pl.Trainer(
-            logger=True,
-            limit_val_batches=PERCENT_VALID_EXAMPLES,
-            enable_checkpointing=False,
-            max_epochs=EPOCHS,
-            gpus=1 if torch.cuda.is_available() else None,
-            callbacks=[PyTorchLightningPruningCallback(trial, monitor="val_acc")],
+            num_nodes=int(os.environ.get("GROUP_WORLD_SIZE", 1)),
+            accelerator="cuda",
+            devices=int(os.environ.get("LOCAL_WORLD_SIZE", 1)),
+            logger=logger,
+            max_epochs=self.args["epochs"],
+            callbacks=callbacks,
+            profiler=SimpleProfiler(logger),
+            log_every_n_steps=self.args["log_steps"],
         )
-        hyperparameters = dict(
-            n_layers=n_layers, dropout=dropout, output_dims=output_dims
-        )
-        trainer.logger.log_hyperparams(hyperparameters)
-        trainer.fit(model, datamodule=datamodule)
 
-        return trainer.callback_metrics["val_acc"].item()
+        trainer.fit(self.model, datamodule=self.datamodule)
+        torch.save(self.model.state_dict(), f"{self.args['output_path']}/model.pt")
+
+        return trainer.callback_metrics["val_loss"]

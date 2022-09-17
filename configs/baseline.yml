@@ -48,7 +48,7 @@ nhid: 128
 # LR Schedule to adept over time
 lr_scheduler_type: "linear"
 # Epochs
-epochs: 1000
+epochs: 75
 # Early stopping
 patience: 100
 # Custom Trainer
@@ -65,6 +65,8 @@ sample_neighbor: True
 sparse_attention: True
 # Structure Learning
 structure_learning: True
+# Pruning
+pruning: True
 
 
 # Should there be a tensorboard log?
