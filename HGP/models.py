@@ -146,9 +146,7 @@ class GraphDataModule(pl.LightningDataModule):
         """Loads the dataset and splits the dataset into train, val and test"""
 
         split_train = int(self.dataset.len() * self.args["split_ratio"])
-        split_val = int(
-            self.dataset.len() * 1 - self.args["split_ratio"] / self.args["test_ratio"]
-        )
+        split_val = int((self.dataset.len() - split_train) * self.args["test_ratio"])
         split_test = self.dataset.len() - split_val - split_train
 
         self.train_data, self.eval_data, self.test_data = random_split(
