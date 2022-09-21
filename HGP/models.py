@@ -206,16 +206,13 @@ class HPT:
         # TODO: actual use layer params
 
         hpt_dict = {
+            "lr": trial.suggest_loguniform("lr", 1e-5, 1e-1),
             "nhid": trial.suggest_int("nhid", 64, 256),
             "dropout_ratio": trial.suggest_float("dropout_ratio", 0, 0.01),
             "pooling_ratio": trial.suggest_float("pooling_ratio", 0, 0.5),
             "sample": trial.suggest_categorical("sample", [True, False]),
             "sparse": trial.suggest_categorical("sparse", [True, False]),
-            "lambs": trial.suggest_float("lambs", 0.5, 1),
             # "num_conv_layers": trial.suggest_int("num_conv_layers", 1, 5),
-            "structure_learning": trial.suggest_categorical(
-                "structure_learning", [True, False]
-            ),
         }
 
         self.args.update(hpt_dict)

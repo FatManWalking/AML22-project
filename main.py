@@ -86,9 +86,7 @@ if args_dict["resume_from_checkpoint"]:
     model.load_from_checkpoint(checkpoint_path=args_dict["output_path"])
 
 if args_dict["logging"]:
-    logger = TensorBoardLogger(
-        save_dir=args_dict["log_path"], name=args_dict["experiment_name"]
-    )
+    logger = TensorBoardLogger(save_dir="log", name=args_dict["experiment_name"])
 else:
     assert False, "No logger defined"
 
