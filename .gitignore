@@ -133,3 +133,4 @@ dmypy.json
 /model
 /data
 /GCN/models
+/GCN/data
