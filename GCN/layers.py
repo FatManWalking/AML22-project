@@ -1,11 +1,13 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch_geometric
 from sparse_softmax import Sparsemax
 from torch.nn.parameter import Parameter  # Path changed in newer version
 from torch_geometric.data import Data
 from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.nn.pool import SAGPooling
+from torch_geometric.nn import GraphConv
 from torch_geometric.nn.pool.topk_pool import topk, filter_adj
 from torch_geometric.utils import softmax, dense_to_sparse, add_remaining_self_loops
 from torch_scatter import scatter_add
@@ -27,8 +29,7 @@ class TwoHopNeighborhood(object):
         n = data.num_nodes  # Note how many nodes there are
 
         fill = 1e16  # previously used to prevent a overflow when this threshold was reached the edge attribute was reset to 0
-        value = edge_index.new_full(
-            (edge_index.size(1),), fill, dtype=torch.float)
+        value = edge_index.new_full((edge_index.size(1),), fill, dtype=torch.float)
 
         index, value = spspmm(
             edge_index, value, edge_index, value, n, n, n, True
@@ -115,8 +116,7 @@ class GCN(MessagePassing):
 
         if not self.cached or self.cached_result is None:
             self.cached_num_edges = edge_index.size(1)
-            edge_index, norm = self.norm(
-                edge_index, x.size(0), edge_weight, x.dtype)
+            edge_index, norm = self.norm(edge_index, x.size(0), edge_weight, x.dtype)
             self.cached_result = edge_index, norm
 
         edge_index, norm = self.cached_result
@@ -186,8 +186,7 @@ class NodeInformationScore(MessagePassing):
 
         if not self.cached or self.cached_result is None:
             self.cached_num_edges = edge_index.size(1)
-            edge_index, norm = self.norm(
-                edge_index, x.size(0), edge_weight, x.dtype)
+            edge_index, norm = self.norm(edge_index, x.size(0), edge_weight, x.dtype)
             self.cached_result = edge_index, norm
 
         edge_index, norm = self.cached_result
@@ -201,18 +200,23 @@ class NodeInformationScore(MessagePassing):
         return aggr_out
 
 
-class SAGPool(torch.nn.pool.SAGPooling):
+class SAGPool(torch_geometric.nn.pool.SAGPooling):
     def __init__(
         self,
         in_channels,
         ratio=0.8,
     ):
         super(SAGPooling, self).__init__()
+        self.gnn = GraphConv(in_channels, 1)
+        self.min_score = None
+        self.multiplier = 1.0
+        self.nonlinearity = torch.tanh
         self.in_channels = in_channels
         self.ratio = ratio
 
     def forward(self, x, edge_index, edge_attr, batch=None):
-        x, edge_index, edge_attr, batch, _, _ = super(
-            SAGPooling, self).forward(x, edge_index, edge_attr, batch)
+        x, edge_index, edge_attr, batch, _, _ = SAGPooling.forward(
+            self, x, edge_index, edge_attr=edge_attr, batch=batch
+        )
 
         return x, edge_index, edge_attr, batch

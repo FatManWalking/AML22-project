@@ -195,7 +195,7 @@ class HPT:
             else optuna.pruners.NopPruner()
         )
         self.study = optuna.create_study(
-            direction="maximize",
+            direction="minimize",
             pruner=pruner,
         )
 
@@ -222,7 +222,7 @@ class HPT:
 
         if self.args["logging"]:
             logger = TensorBoardLogger(
-                save_dir=self.args["log_path"], version=1, name="lightning_logs"
+                save_dir="log", name=self.args["experiment_name"]
             )
         else:
             assert False, "No logger defined"
@@ -245,12 +245,20 @@ class HPT:
             devices=int(os.environ.get("LOCAL_WORLD_SIZE", 1)),
             logger=logger,
             max_epochs=self.args["epochs"],
-            callbacks=callbacks,
+            # callbacks=callbacks,
             profiler=SimpleProfiler(logger),
             log_every_n_steps=self.args["log_steps"],
         )
 
         trainer.fit(self.model, datamodule=self.datamodule)
+
+        Path(self.args["output_path"]).mkdir(parents=True, exist_ok=True)
         torch.save(self.model.state_dict(), f"{self.args['output_path']}/model.pt")
+
+        print(
+            " ------- Validation loss: ",
+            trainer.callback_metrics["val_loss"],
+            " ------- ",
+        )
 
         return trainer.callback_metrics["val_loss"]

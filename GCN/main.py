@@ -108,7 +108,7 @@ def train():
         )
 
         val_loss_values.append(loss_val)
-        torch.save(model.state_dict(), "{}.pth".format(epoch))
+        torch.save(model.state_dict(), "models/{}.pth".format(epoch))
         if val_loss_values[-1] < min_loss:
             min_loss = val_loss_values[-1]
             best_epoch = epoch
@@ -152,7 +152,7 @@ if __name__ == "__main__":
     # Model training
     best_model = train()
     # Restore best model for test set
-    model.load_state_dict(torch.load("{}.pth".format(best_model)))
+    model.load_state_dict(torch.load("models/{}.pth".format(best_model)))
     test_acc, test_loss = compute_test(test_loader)
     print(
         "Test set results, loss = {:.6f}, accuracy = {:.6f}".format(test_loss, test_acc)
