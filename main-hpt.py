@@ -29,7 +29,7 @@ from optuna.integration import PyTorchLightningPruningCallback
 from HGP.models import HPT
 
 # %%
-args_dict = take_hp("configs/hpt-search-enzymes.yml")
+args_dict = take_hp("configs/hpt-search-nci.yml")
 
 pl.seed_everything(args_dict["random_seed"], workers=True)
 
