@@ -134,7 +134,7 @@ class GraphDataModule(pl.LightningDataModule):
         self.args = args
 
         self.dataset = TUDataset(
-            str(Path.cwd().joinpath("data", self.args["dataset"])),
+            "data",
             name=self.args["dataset"],
             use_node_attr=True,
         )
@@ -166,6 +166,7 @@ class GraphDataModule(pl.LightningDataModule):
             batch_size=self.args["batch_size"],
             shuffle=True,
             num_workers=self.args["num_workers"],
+            drop_last=True,
         )
 
     def val_dataloader(self) -> DataLoader:
@@ -190,7 +191,7 @@ class HPT:
         self.args = args
 
         pruner: optuna.pruners.BasePruner = (
-            optuna.pruners.MedianPruner(n_startup_trials=10)
+            optuna.pruners.MedianPruner(n_startup_trials=3)
             if args["pruning"]
             else optuna.pruners.NopPruner()
         )
@@ -199,19 +200,19 @@ class HPT:
             pruner=pruner,
         )
 
-        self.study.optimize(self.objective, n_trials=20, timeout=None)
+        self.study.optimize(self.objective, n_trials=30, timeout=None)
 
     def objective(self, trial: optuna.trial.Trial) -> float:
 
         # TODO: actual use layer params
 
         hpt_dict = {
-            "lr": trial.suggest_loguniform("lr", 1e-5, 1e-1),
+            # "lr": trial.suggest_float("lr", 1e-3, 1e-1),
             "nhid": trial.suggest_int("nhid", 64, 256),
             "dropout_ratio": trial.suggest_float("dropout_ratio", 0, 0.01),
             "pooling_ratio": trial.suggest_float("pooling_ratio", 0, 0.5),
-            "sample": trial.suggest_categorical("sample", [True, False]),
-            "sparse": trial.suggest_categorical("sparse", [True, False]),
+            # "sample": trial.suggest_categorical("sample", [True, False]),
+            # "sparse": trial.suggest_categorical("sparse", [True, False]),
             # "num_conv_layers": trial.suggest_int("num_conv_layers", 1, 5),
         }
 
@@ -247,7 +248,11 @@ class HPT:
             log_every_n_steps=self.args["log_steps"],
         )
 
-        trainer.fit(self.model, datamodule=self.datamodule)
+        try:
+            trainer.fit(self.model, self.datamodule)
+        except RuntimeError as e:
+            print(e)
+        # trainer.fit(self.model, datamodule=self.datamodule)
 
         Path(self.args["output_path"]).mkdir(parents=True, exist_ok=True)
         torch.save(self.model.state_dict(), f"{self.args['output_path']}/model.pt")
