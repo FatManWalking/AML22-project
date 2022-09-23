@@ -200,7 +200,7 @@ class HPT:
             pruner=pruner,
         )
 
-        self.study.optimize(self.objective, n_trials=30, timeout=None)
+        self.study.optimize(self.objective, n_trials=35, timeout=None)
 
     def objective(self, trial: optuna.trial.Trial) -> float:
 
