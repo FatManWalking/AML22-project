@@ -5,7 +5,7 @@ import pytorch_lightning as pl
 import torch.nn.functional as F
 from torch_geometric.nn import global_mean_pool as gap, global_max_pool as gmp
 
-from torchmetrics import MatthewsCorrCoef, F1Score, ConfusionMatrix
+from torchmetrics import MatthewsCorrCoef, F1Score, ConfusionMatrix, Accuracy
 
 import optuna
 from optuna.integration import PyTorchLightningPruningCallback
@@ -86,13 +86,11 @@ class LightModel(pl.LightningModule):
         self.loss_fn = torch.nn.NLLLoss()
 
         # LOGS
-        self.train_mcc = MatthewsCorrCoef(num_classes=args["num_classes"])
-        self.train_f1 = F1Score(num_classes=args["num_classes"])
-        self.train_confusion_matrix = ConfusionMatrix(num_classes=args["num_classes"])
-
-        self.val_mcc = MatthewsCorrCoef(num_classes=args["num_classes"])
-        self.val_f1 = F1Score(num_classes=args["num_classes"])
-        self.val_confusion_matrix = ConfusionMatrix(num_classes=args["num_classes"])
+        self.mcc = MatthewsCorrCoef(num_classes=args["num_classes"])
+        self.f1 = F1Score(num_classes=args["num_classes"])
+        # self.confusion_matrix = ConfusionMatrix(num_classes=args["num_classes"])
+        self.mcc = MatthewsCorrCoef(num_classes=args["num_classes"])
+        self.acc = Accuracy(num_classes=args["num_classes"])
 
     def forward(self, data):
         return self.model(data)
@@ -102,8 +100,9 @@ class LightModel(pl.LightningModule):
         out = self.forward(data)
         loss = self.loss_fn(out, data.y)
         self.log("train_loss", loss)
-        self.log("train_f1", self.train_f1(out, data.y))
-        self.log("train_mcc", self.train_mcc(out, data.y))
+        self.log("train_f1", self.f1(out, data.y))
+        self.log("train_mcc", self.mcc(out, data.y))
+        self.log("train_acc", self.acc(out, data.y))
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -111,8 +110,9 @@ class LightModel(pl.LightningModule):
         out = self.forward(data)
         loss = self.loss_fn(out, data.y)
         self.log("val_loss", loss)
-        self.log("val_f1", self.val_f1(out, data.y))
-        self.log("val_mcc", self.val_mcc(out, data.y))
+        self.log("val_f1", self.f1(out, data.y))
+        self.log("val_mcc", self.mcc(out, data.y))
+        self.log("val_acc", self.acc(out, data.y))
         return loss
 
     def test_step(self, batch, batch_idx):
@@ -120,6 +120,10 @@ class LightModel(pl.LightningModule):
         out = self.forward(data)
         loss = self.loss_fn(out, data.y)
         self.log("test_loss", loss)
+        self.log("test_f1", self.f1(out, data.y))
+        self.log("test_mcc", self.mcc(out, data.y))
+        self.log("test_acc", self.acc(out, data.y))
+        # self.log("test_confusion_matrix", self.confusion_matrix(out, data.y))
         return loss
 
     def configure_optimizers(self):
@@ -166,7 +170,7 @@ class GraphDataModule(pl.LightningDataModule):
             batch_size=self.args["batch_size"],
             shuffle=True,
             num_workers=self.args["num_workers"],
-            drop_last=True,
+            # drop_last=True,
         )
 
     def val_dataloader(self) -> DataLoader:
@@ -200,7 +204,7 @@ class HPT:
             pruner=pruner,
         )
 
-        self.study.optimize(self.objective, n_trials=35, timeout=None)
+        self.study.optimize(self.objective, n_trials=50, timeout=None)
 
     def objective(self, trial: optuna.trial.Trial) -> float:
 
