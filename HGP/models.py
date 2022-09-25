@@ -195,7 +195,7 @@ class HPT:
         self.args = args
 
         pruner: optuna.pruners.BasePruner = (
-            optuna.pruners.MedianPruner(n_startup_trials=3)
+            optuna.pruners.MedianPruner(n_startup_trials=20)
             if args["pruning"]
             else optuna.pruners.NopPruner()
         )
@@ -204,7 +204,8 @@ class HPT:
             pruner=pruner,
         )
 
-        self.study.optimize(self.objective, n_trials=50, timeout=None)
+        self.id = 0  # for saving all models
+        self.study.optimize(self.objective, n_trials=5, timeout=None)
 
     def objective(self, trial: optuna.trial.Trial) -> float:
 
@@ -212,9 +213,9 @@ class HPT:
 
         hpt_dict = {
             # "lr": trial.suggest_float("lr", 1e-3, 1e-1),
-            "nhid": trial.suggest_int("nhid", 64, 256),
-            "dropout_ratio": trial.suggest_float("dropout_ratio", 0, 0.01),
-            "pooling_ratio": trial.suggest_float("pooling_ratio", 0, 0.5),
+            # "nhid": trial.suggest_int("nhid", 64, 256),
+            # "dropout_ratio": trial.suggest_float("dropout_ratio", 0, 0.01),
+            # "pooling_ratio": trial.suggest_float("pooling_ratio", 0, 0.5),
             # "sample": trial.suggest_categorical("sample", [True, False]),
             # "sparse": trial.suggest_categorical("sparse", [True, False]),
             # "num_conv_layers": trial.suggest_int("num_conv_layers", 1, 5),
@@ -254,17 +255,14 @@ class HPT:
 
         try:
             trainer.fit(self.model, self.datamodule)
+            Path(self.args["output_path"]).mkdir(parents=True, exist_ok=True)
+            torch.save(
+                self.model.state_dict(),
+                f"{self.args['output_path']}/model_{self.id}.pt",
+            )
+            self.id += 1
         except RuntimeError as e:
             print(e)
         # trainer.fit(self.model, datamodule=self.datamodule)
-
-        Path(self.args["output_path"]).mkdir(parents=True, exist_ok=True)
-        torch.save(self.model.state_dict(), f"{self.args['output_path']}/model.pt")
-
-        print(
-            " ------- Validation loss: ",
-            trainer.callback_metrics["val_loss"],
-            " ------- ",
-        )
 
         return trainer.callback_metrics["val_loss"]
