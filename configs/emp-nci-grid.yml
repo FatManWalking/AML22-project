@@ -8,51 +8,38 @@ task_type: "statistical"
 # GPU or CPU
 device: "cuda"
 # an identifyable name (suffix)
-experiment_name: "emp-proteins"
+experiment_name: "emp-nci-grid"
 experiment_name_suffix: ""
 # Dataset (provided by torch.gym)
-dataset: "PROTEINS" # DD/PROTEINS/NCI1/NCI109/Mutagenicity/ENZYMES
+dataset: "NCI1" # DD/PROTEINS/NCI1/NCI109/Mutagenicity/ENZYMES
 # Random Seed to generate reproducable random things
 random_seed: 42
 
 # The architecture of the model you're using
-architecture: "emp-hgpsl"
-# Strucure Learning
-structure_learning: True
+architecture: "emp-nci"
 # Resume training
 resume_from_checkpoint: False
 # Number of Workers
 num_workers: 4
+# learning rate
+lr: 1e-03
 # load the best model after training
 load_best: True
 # Checkpoint save location (will create a subfolder with the experiment name --> /model/test/..)
 output_path: "model"
 # is a higher value better in the metric you use?
 greater_better: True
-# metric you want to use
-metric_used: "matthews_correlation"
 # Split Ratio
-split_ratio: 0.7
+split_ratio: 0.5
 # Ratio between Eval and Test data (0.5 = 50/50). Higher means more Eval
 test_ratio: 0.5
 #Hyperparameters
 # Batch Size
-batch_size: 600
-# Learning Rate
-lr: 1e-03
-weight_decay: 1e-03
-# Warm up for the learning rate
-warm_up: 1/5
+batch_size: 800
 # Hidden Size
 nhid: 128
-# LR Schedule to adept over time
-lr_scheduler_type: "linear"
 # Epochs
-epochs: 200
-# Pooling Ratio
-pooling_ratio: 0.3
-# Dropout Ratio
-dropout_ratio: 1e-03
+epochs: 120
 # Lamb - The tradeoff parameter
 lamb: 1
 # Neighbor sampling
