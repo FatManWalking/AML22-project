@@ -1,0 +1,64 @@
+# This file is used as a baseline
+# These are all the possible arguments to configure the trainer
+# Please changes the ones you want to change
+# and delete all options you do not want to call explicity
+
+# The name of the task you are training
+task_type: "statistical"
+# GPU or CPU
+device: "cuda"
+# an identifyable name (suffix)
+experiment_name: "emp-nci-grid"
+experiment_name_suffix: ""
+# Dataset (provided by torch.gym)
+dataset: "NCI1" # DD/PROTEINS/NCI1/NCI109/Mutagenicity/ENZYMES
+# Random Seed to generate reproducable random things
+random_seed: 42
+
+# The architecture of the model you're using
+architecture: "emp-nci"
+# Resume training
+resume_from_checkpoint: False
+# Number of Workers
+num_workers: 4
+# learning rate
+lr: 1e-03
+# load the best model after training
+load_best: True
+# Checkpoint save location (will create a subfolder with the experiment name --> /model/test/..)
+output_path: "model"
+# is a higher value better in the metric you use?
+greater_better: True
+# Split Ratio
+split_ratio: 0.5
+# Ratio between Eval and Test data (0.5 = 50/50). Higher means more Eval
+test_ratio: 0.5
+#Hyperparameters
+# Batch Size
+batch_size: 800
+# Hidden Size
+nhid: 128
+# Epochs
+epochs: 120
+# Lamb - The tradeoff parameter
+lamb: 1
+# Neighbor sampling
+sample_neighbor: True
+# Sparse Attention
+sparse_attention: True
+# Structure Learning
+structure_learning: True
+# Pruning
+pruning: True
+
+
+# Should there be a tensorboard log?
+logging: True
+log_path: "log"
+logging_strategy: "steps"
+log_steps: 1
+evaluation_strategy: "steps"
+evaluation_steps: 1
+save_strategy: "steps"
+save_steps: 100
+save_limits: 5
