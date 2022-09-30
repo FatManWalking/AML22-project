@@ -1,61 +1,41 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch_geometric
-from sparse_softmax import Sparsemax
-from torch.nn.parameter import Parameter  # Path changed in newer version
+from GCN.sparse_softmax import Sparsemax
+from torch.nn import Parameter
 from torch_geometric.data import Data
 from torch_geometric.nn.conv import MessagePassing
-from torch_geometric.nn.pool import SAGPooling
 from torch_geometric.nn import GraphConv
 from torch_geometric.nn.pool.topk_pool import topk, filter_adj
 from torch_geometric.utils import softmax, dense_to_sparse, add_remaining_self_loops
 from torch_scatter import scatter_add
-from torch_sparse import spspmm, coalesce  # Coalesce is not backward compatible
+from torch_sparse import spspmm, coalesce
+import torch_geometric
+from torch_geometric.nn.pool import SAGPooling
 
 
 class TwoHopNeighborhood(object):
-    """
-    Takes the data and returns the two-hop neighbors
-    as in getting adjecency matrix A and returning A^2
-    and when getting A^2 returning A^3
-    """
+    def __call__(self, data):
+        edge_index, edge_attr = data.edge_index, data.edge_attr
+        n = data.num_nodes
 
-    def __call__(self, data: Data):
-        edge_index, edge_attr = (
-            data.edge_index,
-            data.edge_attr,
-        )  # Get the edges from the homogenous graph represented in torch.geometric.data
-        n = data.num_nodes  # Note how many nodes there are
-
-        fill = 1e16  # previously used to prevent a overflow when this threshold was reached the edge attribute was reset to 0
+        fill = 1e16
         value = edge_index.new_full((edge_index.size(1),), fill, dtype=torch.float)
 
-        index, value = spspmm(
-            edge_index, value, edge_index, value, n, n, n, True
-        )  # Matrix product of two sparse tensors aka our adjaceny matrices
+        index, value = spspmm(edge_index, value, edge_index, value, n, n, n, True)
 
-        edge_index = torch.cat(
-            [edge_index, index], dim=1
-        )  # Concatinating the edge indices to match otherwise you have the edges twice
+        edge_index = torch.cat([edge_index, index], dim=1)
         if edge_attr is None:
-            data.edge_index, _ = coalesce(
-                edge_index, None, n, n
-            )  # If the edges have no values you can just combine the indices
-        else:  # Otherwise you go through this to combine the values of the double edges
+            data.edge_index, _ = coalesce(edge_index, None, n, n)
+        else:
             value = value.view(-1, *[1 for _ in range(edge_attr.dim() - 1)])
             value = value.expand(-1, *list(edge_attr.size())[1:])
-            edge_attr = torch.cat(
-                [edge_attr, value], dim=0
-            )  # Concatinating the edge attributes
-            # Since the fill_value argument is missing too large neighborhoods might explode the edge attributes
+            edge_attr = torch.cat([edge_attr, value], dim=0)
             data.edge_index, edge_attr = coalesce(
-                edge_index, edge_attr, n, n, op="min"
-            )  # Option min calls torch.ops.torch_scatter.segment_min_csr(src, indptr, out) other options are "add", "max", and "mean" for combining the attributes
-            edge_attr[
-                edge_attr >= fill
-            ] = 0  # This will reset the value if the edge attribute value explodes
-            data.edge_attr = edge_attr  # Reset the Attribute in the original graph
+                edge_index, edge_attr, n, n, op="min", fill_value=fill
+            )
+            edge_attr[edge_attr >= fill] = 0
+            data.edge_attr = edge_attr
 
         return data
 
@@ -74,7 +54,6 @@ class GCN(MessagePassing):
         self.cached_num_edges = None
 
         self.weight = Parameter(torch.Tensor(in_channels, out_channels))
-        # A Xavier uniform weight distribution to init the neural net is mostly more efficient then starting of a random distribution
         nn.init.xavier_uniform_(self.weight.data)
 
         if bias:

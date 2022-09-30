@@ -27,6 +27,7 @@ import optuna
 from optuna.integration import PyTorchLightningPruningCallback
 
 from HGP.models import HPT
+from GCN.models import HPT as HPT_GCN
 
 # %%
 args_dict = take_hp("configs/hpt-search-nci.yml")

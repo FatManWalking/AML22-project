@@ -4,19 +4,19 @@
 # and delete all options you do not want to call explicity
 
 # The name of the task you are training
-task_type: "statistical-gcn"
+task_type: "statistical-hgp"
 # GPU or CPU
 device: "cuda"
 # an identifyable name (suffix)
-experiment_name: "emp-gcn-nci-grid"
+experiment_name: "emp-hgp-coil-grid"
 experiment_name_suffix: ""
 # Dataset (provided by torch.gym)
-dataset: "NCI1" # DD/PROTEINS/NCI1/NCI109/Mutagenicity/ENZYMES
+dataset: "COIL-RAG" # DD/PROTEINS/NCI1/NCI109/Mutagenicity/ENZYMES
 # Random Seed to generate reproducable random things
 random_seed: 42
 
 # The architecture of the model you're using
-architecture: "emp-gcn-nci"
+architecture: "emp-hgp-coil"
 # Number of Workers
 num_workers: 4
 # learning rate

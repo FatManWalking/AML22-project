@@ -22,6 +22,7 @@ from utils.utilities import get_model_checkpoint
 from pytorch_lightning.profilers import SimpleProfiler
 
 from utils.configuration import save_config
+import itertools
 
 
 class Model(torch.nn.Module):
@@ -210,7 +211,11 @@ class GraphDataModule(pl.LightningDataModule):
 
 class HPT:
     def __init__(self, args):
+
         self.args = args
+
+        self.datamodule = GraphDataModule(self.args)
+        self.args = self.datamodule.update_args(self.args)
 
         self.search_space = {
             # "lr": [3e-3, 2e-3, 1e-3],
@@ -220,46 +225,42 @@ class HPT:
             "structure_learning": [True, False],
         }
 
-        self.study = optuna.create_study(
-            sampler=optuna.samplers.GridSampler(self.search_space)
-        )
+        # self.study = optuna.create_study(
+        #     sampler=optuna.samplers.GridSampler(self.search_space)
+        # )
 
         self.id = 0  # for saving all models
-        self.study.optimize(self.objective, n_trials=3 * 3 * 3 * 2, timeout=None)
 
-    def objective(self, trial: optuna.trial.Trial) -> float:
+        for params in self.grid(self.search_space):
+            self.args.update(params)
+            result = self.objective()
 
-        # TODO: actual use layer params
-
-        hpt_dict = {
-            "dropout_ratio": trial.suggest_float("dropout_ratio", 0, 0.3),
-            "pooling_ratio": trial.suggest_float("pooling_ratio", 0, 0.5),
-            "structure_learning": trial.suggest_categorical(
-                "structure_learning", [True, False]
-            ),
-            "random_seed": trial.suggest_categorical("random_seed", [21, 1337, 2021]),
-        }
-
-        self.args.update(hpt_dict)
-
-        if self.args["logging"]:
-            logger = TensorBoardLogger(
-                save_dir="log", name=self.args["experiment_name"]
+            print(
+                """
+            --------------------
+            Trial {}
+            --------------------
+            Params: {}
+            --------------------
+            Result: {}
+            --------------------
+            """.format(
+                    self.id, params, result
+                )
             )
-        else:
-            assert False, "No logger defined"
+        # self.study.optimize(self.objective, n_trials=3 * 3 * 3 * 2, timeout=None)
 
-        self.datamodule = GraphDataModule(self.args)
-        self.args = self.datamodule.update_args(self.args)
+    def grid(self, d: Dict):
+        # loop through all possible combinations of the dictionary d
+        for i in itertools.product(*d.values()):
+            yield dict(zip(d.keys(), i))
+
+    def objective(self) -> float:
+        """Objective function for optuna, modified to just train with grid search"""
+
+        logger = TensorBoardLogger(save_dir="log", name=self.args["experiment_name"])
+
         self.model = LightModel(self.args).to(self.args["device"])
-
-        checkpoint_callback = get_model_checkpoint(self.args)
-        callbacks = []
-        if checkpoint_callback:
-            callbacks.append(checkpoint_callback)
-        if self.args["resume_from_checkpoint"]:
-            print(f"loading checkpoint: {self.args['output_path']}...")
-            self.model.load_from_checkpoint(checkpoint_path=self.args["output_path"])
 
         trainer = pl.Trainer(
             num_nodes=int(os.environ.get("GROUP_WORLD_SIZE", 1)),
@@ -272,18 +273,13 @@ class HPT:
             log_every_n_steps=self.args["log_steps"],
         )
 
-        try:
-            trainer.fit(self.model, self.datamodule)
-            Path(self.args["output_path"]).mkdir(parents=True, exist_ok=True)
-            filename, filepath = save_config(self.args)
-            torch.save(
-                self.model.state_dict(),
-                f"{self.args['output_path']}/model_{self.id}.pt",
-            )
-            self.id += 1
-
-        except RuntimeError as e:
-            print(e)
-            return 10.0
+        trainer.fit(self.model, self.datamodule)
+        Path(self.args["output_path"]).mkdir(parents=True, exist_ok=True)
+        _, _ = save_config(self.args)
+        torch.save(
+            self.model.state_dict(),
+            f"{self.args['output_path']}/model_{self.id}.pt",
+        )
+        self.id += 1
 
         return trainer.callback_metrics["val_loss"]
